@@ -58,6 +58,8 @@ namespace DBBuilder.MSSQL.Helpers
 			dropOptions.ToFileOnly = true;
 			dropOptions.IncludeIfNotExists = true;
 			dropOptions.ScriptDrops = true;
+			dropOptions.Encoding = Encoding.UTF8;
+			dropOptions.AnsiFile = true;
 
 			ScriptingOptions createOptions = new ScriptingOptions();
 			createOptions.AppendToFile = true;
@@ -67,6 +69,8 @@ namespace DBBuilder.MSSQL.Helpers
 			createOptions.DriAll = true;
 			createOptions.NoCollation = true;
 			createOptions.SchemaQualifyForeignKeysReferences = true;
+			createOptions.Encoding = Encoding.UTF8;
+			createOptions.AnsiFile = true;
 
 			// InitializeDependencyTable();
 			// ToDo: add more fields to support more object types
@@ -773,7 +777,7 @@ namespace DBBuilder.MSSQL.Helpers
 				result.AppendLine();
 			}
 
-			File.WriteAllText(fileName, result.ToString());
+			File.WriteAllText(fileName, result.ToString(), Encoding.UTF8);
 
 			Trace.WriteLineIf(DBTask.traceSwitch.TraceInfo, 
 			                  string.Format(Resources.traceMsgTableData, tableName, numRows));
