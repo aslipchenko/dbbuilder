@@ -1,4 +1,4 @@
-#Description of database development process which is supported by dbbuilder library
+#summary Description of database development process which is supported by dbbuilder library
 
 = Problem statement =
 In the current state of development process, when many people are involved in version development and deployment, application database change management, version update and maintenance becomes more and more difficult. At the moment, database development process is poorly documented and hardly manageable. We need to define such a process that will simplify DB development and upgrade from version to version. 
