@@ -795,16 +795,27 @@ namespace DBBuilder.MSSQL.Helpers
 			object[] res = new object[r.ItemArray.Length];
 			for (int i = 0; i < r.ItemArray.Length; i++)
 			{
-				string resAsString = r[i] as string;
-				if (resAsString != null)
-				{
-					resAsString = resAsString.Replace("'", "''");
-					res[i] = "'" + resAsString + "'";
-				}
+				if (r.IsNull(i))
+					res[i] = "NULL";
 				else
-				{
-					res[i] = r.IsNull(i) ? "NULL" : r[i];
-				}
+					switch (r[i].GetType().Name)
+					{
+						case "String":
+						case "Guid":
+							res[i] = string.Format("'{0}'", r[i].ToString().Replace("'", "''"));
+							break;
+						case "Boolean":
+							res[i] = (bool)r[i] ? "1" : "0";
+							break;
+						case "DateTime":
+							DateTime dt = (DateTime)r[i];
+							res[i] = string.Format("'{0}/{1:00}/{2:00} {3:00}:{4:00}:{5:00}'",
+								dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second);
+							break;
+						default:
+							res[i] = r[i];
+							break;
+					}
 			}
 			return res;
 		}
