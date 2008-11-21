@@ -287,4 +287,15 @@ namespace DBBuilder.MSSQL
 			return true;
 		}
 	}
+
+	public class DBClearTask : DBTask
+	{
+
+		public override bool Execute()
+		{
+			Trace.WriteIf(traceSwitch.TraceVerbose, "DBClearTask invoked");
+			SqlServerHelper.ClearDB(ServerName, DatabaseName, Log);
+			return !Log.HasLoggedErrors;
+		}
+	}
 }

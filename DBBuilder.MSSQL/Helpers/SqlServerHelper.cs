@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Text;
 using System.Data;
 using DBBuilder.MSSQL;
@@ -189,7 +190,6 @@ namespace DBBuilder.MSSQL.Helpers
 
 			UpdateDependencies(objectTypes, dependencies, srv);
 			dependencies.WriteXml(outputDir + "\\" + dependencyFileName);
-
 		}
 
 
@@ -269,32 +269,29 @@ namespace DBBuilder.MSSQL.Helpers
 							{
 								rdr.Close();
 								srv.ConnectionContext.ExecuteNonQuery(fileContent);
-								logger.LogMessage(string.Format(Resources.msgOK, fileName));
-
+								if (logger != null) logger.LogMessage(string.Format(Resources.msgOK, fileName));
 								SaveConversionResults(srv, md5Hash, fileName, fileContent, true, logger);
 							}
 							else
 							{
-								logger.LogMessage(string.Format(Resources.msgScriptWasExecutedBefore,
+								if (logger != null) logger.LogMessage(string.Format(Resources.msgScriptWasExecutedBefore,
 								                                fileName, rdr.GetInt32(0), rdr.GetDateTime(1)));
 								rdr.Close();
 							}
 						}
 						catch (ExecutionFailureException ex)
 						{
-							logger.LogError(string.Format(Resources.msgFailure, fileName, ex));
-							logger.LogMessage(Resources.msgSkipConversionScriptsAfterError);
+							if (logger != null) logger.LogError(string.Format(Resources.msgFailure, fileName, ex));
+							if (logger != null) logger.LogMessage(Resources.msgSkipConversionScriptsAfterError);
 							SaveConversionResults(srv, md5Hash, fileName, fileContent, false, logger);
 							break;
 						}
 						catch (IOException ex)
 						{
-							logger.LogError(string.Format(Resources.msgFailure, fileName, ex.Message));
+							if (logger != null) logger.LogError(string.Format(Resources.msgFailure, fileName, ex.Message));
 						}
 					} // for
-
-					logger.LogMessage(string.Format(Resources.msgFinishedConversion, databaseName, i));
-
+					if (logger != null) logger.LogMessage(string.Format(Resources.msgFinishedConversion, databaseName, i));
 				}
 
 				#endregion
@@ -314,6 +311,53 @@ namespace DBBuilder.MSSQL.Helpers
 				{
 					srv.ConnectionContext.ExecuteNonQuery(string.Format(Resources.sqlMultiUser, databaseName));
 				}
+			}
+
+		}
+
+		/// <summary>
+		/// Deletes all objects from given database
+		/// </summary>
+		/// <param name="serverName"></param>
+		/// <param name="databaseName"></param>
+		/// <param name="logger"></param>
+		public static void ClearDB(string serverName, string databaseName, TaskLoggingHelper logger)
+		{
+			Server srv = ConnectToServer(serverName, databaseName);
+			SqlObjectType objectTypesToDrop = SqlObjectType.Assembly
+			                                  | SqlObjectType.StoredProcedure
+			                                  | SqlObjectType.Trigger
+			                                  | SqlObjectType.UserDefinedFunction
+			                                  | SqlObjectType.FTCatalog
+			                                  | SqlObjectType.View;
+
+			// Drop logic objects
+			DropDBObjects(srv, databaseName, objectTypesToDrop, logger);
+
+			ScriptingOptions dropOptions = new ScriptingOptions();
+			dropOptions.ToFileOnly = false;
+			dropOptions.ScriptDrops = true;
+			dropOptions.PrimaryObject = false;
+
+			List<StringCollection> dropConstraints = new List<StringCollection>();
+			List<StringCollection> dropTables = new List<StringCollection>();
+			foreach(Table t in srv.Databases[databaseName].Tables)
+			{
+				foreach(ForeignKey fk in t.ForeignKeys)
+				{
+					dropConstraints.Add(fk.Script(dropOptions));
+				}
+				dropTables.Add(t.Script(dropOptions));
+			}
+
+			foreach (StringCollection q in dropConstraints)
+			{
+				srv.ConnectionContext.ExecuteNonQuery(q);
+			}
+
+			foreach (StringCollection q in dropTables)
+			{
+				srv.ConnectionContext.ExecuteNonQuery(q);
 			}
 
 		}
@@ -404,25 +448,41 @@ namespace DBBuilder.MSSQL.Helpers
 				{
 					if (srv.Information.Version.Major >= requiredServerVersion)
 					{
-						depData = GetDependencies((SqlObjectType)val, srv);
-						//sql = Resources.sqlMSDependencyTemplate + Enum.Format(typeof(SqlObjectType), val, "x");
-						//depData = srv.ConnectionContext.ExecuteWithResults(sql).Tables[0];
-						depData.DefaultView.Sort = "oSequence desc";
-
-						for (int i = 0; i < depData.DefaultView.Count; i++)
+						bool doNotUseDependencies = GetDoNotUseSysDependencies((SqlObjectType) val);
+						if (doNotUseDependencies)
 						{
-							string objectName = (string)depData.DefaultView[i]["oObjName"];
-							object objectToDrop = GetDBObjectByName(srv, databaseName, objectName, (SqlObjectType)val);
-							if ((objectToDrop != null) && (objectToDrop is IDroppable))
+							ScriptingOptions dropOptions = new ScriptingOptions();
+							dropOptions.ToFileOnly = false;
+							dropOptions.ScriptDrops = true;
+							dropOptions.PrimaryObject = false;
+							List<StringCollection> dropQueries = new List<StringCollection>();
+							foreach (SmoObjectBase c in GetDBObjectsByType(srv, databaseName, (SqlObjectType)val))
 							{
-								(objectToDrop as IDroppable).Drop();
-
-								Trace.WriteLineIf(DBTask.traceSwitch.TraceVerbose,
-								                  string.Format(Resources.traceMsgObjectDropped, objectName));
+								if (c is IScriptable)
+									dropQueries.Add((c as IScriptable).Script(dropOptions));
+							}
+							foreach (StringCollection q in dropQueries)
+							{
+								srv.ConnectionContext.ExecuteNonQuery(q);
 							}
 						}
-
-						logger.LogMessage(string.Format(Resources.msgDeletedObjects, val.ToString(), databaseName));
+						else
+						{
+							depData = GetDependencies((SqlObjectType) val, srv);
+							depData.DefaultView.Sort = "oSequence desc";
+							for (int i = 0; i < depData.DefaultView.Count; i++)
+							{
+								string objectName = (string) depData.DefaultView[i]["oObjName"];
+								object objectToDrop = GetDBObjectByName(srv, databaseName, objectName, (SqlObjectType) val);
+								if ((objectToDrop != null) && (objectToDrop is IDroppable))
+								{
+									(objectToDrop as IDroppable).Drop();
+									Trace.WriteLineIf(DBTask.traceSwitch.TraceVerbose,
+									                  string.Format(Resources.traceMsgObjectDropped, objectName));
+								}
+							}
+						}
+						if (logger != null) logger.LogMessage(string.Format(Resources.msgDeletedObjects, val.ToString(), databaseName));
 					}
 					else
 					{
@@ -457,7 +517,7 @@ namespace DBBuilder.MSSQL.Helpers
 						                  string.Format(Resources.traceMsgObjectDropped, triggerName));
 					}
 				}
-				logger.LogMessage(string.Format(Resources.msgDeletedObjects, "table triggers", databaseName));
+				if (logger != null) logger.LogMessage(string.Format(Resources.msgDeletedObjects, "table triggers", databaseName));
 			}
 		}
 
@@ -500,6 +560,49 @@ namespace DBBuilder.MSSQL.Helpers
 					break;
 				case SqlObjectType.FTCatalog:
 					result = srv.Databases[databaseName].FullTextCatalogs[objectName];
+					break;
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// Returns array of objects of a given type
+		/// </summary>
+		/// <param name="srv">Server</param>
+		/// <param name="databaseName">Database to connect to</param>
+		/// <param name="objectType">Object type to retrieve</param>
+		/// <returns></returns>
+		private static SmoCollectionBase GetDBObjectsByType(Server srv, string databaseName, SqlObjectType objectType)
+		{
+			SmoCollectionBase result = null;
+			switch (objectType)
+			{
+				case SqlObjectType.UserDefinedFunction:
+					result = srv.Databases[databaseName].UserDefinedFunctions;
+					break;
+				case SqlObjectType.View:
+					result = srv.Databases[databaseName].Views;
+					break;
+				case SqlObjectType.UserTable:
+					result = srv.Databases[databaseName].Tables;
+					break;
+				case SqlObjectType.StoredProcedure:
+					result = srv.Databases[databaseName].StoredProcedures;
+					break;
+				case SqlObjectType.Trigger:
+					result = srv.Databases[databaseName].Triggers;
+					break;
+				case SqlObjectType.Assembly:
+					result = srv.Databases[databaseName].Assemblies;
+					break;
+				case SqlObjectType.UserDefinedType:
+					result = srv.Databases[databaseName].UserDefinedTypes;
+					break;
+				case SqlObjectType.Schema:
+					result = srv.Databases[databaseName].Schemas;
+					break;
+				case SqlObjectType.FTCatalog:
+					result = srv.Databases[databaseName].FullTextCatalogs;
 					break;
 			}
 			return result;
@@ -678,7 +781,6 @@ namespace DBBuilder.MSSQL.Helpers
 
 			try
 			{
-
 				if (lockDatabase)
 				{
 					srv.ConnectionContext.ExecuteNonQuery(string.Format(Resources.sqlSingleUser, databaseName));
@@ -713,7 +815,6 @@ namespace DBBuilder.MSSQL.Helpers
 					srv.ConnectionContext.ExecuteNonQuery(string.Format(Resources.sqlMultiUser, databaseName));
 				}
 			}
-
 		}
 
 
@@ -918,6 +1019,13 @@ namespace DBBuilder.MSSQL.Helpers
 			return tmp.Length > 0 ? ((RequiredServerVersion)tmp[0]).Major : 0;
 		}
 
+		private static bool GetDoNotUseSysDependencies(SqlObjectType objectType)
+		{
+			FieldInfo fi = typeof(SqlObjectType).GetField(objectType.ToString());
+			object[] tmp = fi.GetCustomAttributes(typeof(DoNotUseSysDependenciesAttribute), false);
+			return tmp.Length > 0 ? true : false;
+		}
+
 		/// <summary>
 		/// Compose file name depending on settings and object type
 		/// </summary>
@@ -1071,7 +1179,6 @@ namespace DBBuilder.MSSQL.Helpers
 			Trace.WriteLineIf(DBTask.traceSwitch.TraceInfo, 
 			                  string.Format(Resources.traceMsgCreateDBObjectsInvocation, inputDirName, dependencyFileName));
 
-			// InitializeDependencyTable();
 			// ToDo: add more fields to support more object types
 			DataTable _dependencies = ReadDependencyFile(inputDirName, dependencyFileName, logger);
 			if (_dependencies == null)

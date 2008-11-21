@@ -23,6 +23,11 @@ namespace DBBuilder.MSSQL
 		}
 	}
 
+	public class DoNotUseSysDependenciesAttribute : Attribute
+	{
+		
+	}
+
 	public class SavePropertiesAttribute : Attribute
 	{
 		public SavePropertiesAttribute(string prefix, string suffix, string dirName)
@@ -82,6 +87,7 @@ namespace DBBuilder.MSSQL
 
 		[SaveProperties("ass", "assembly", "Assembly")]
 		[RequiredServerVersion(9)]
+		[DoNotUseSysDependencies]
 		Assembly = 0x0200,
 
 		[SaveProperties("udt", "udt", "UDT")]
@@ -92,6 +98,7 @@ namespace DBBuilder.MSSQL
 		Schema = 0x0800,
 
 		[SaveProperties("", "ftcatalog", "FTCatalog")]
+		[DoNotUseSysDependencies]
 		FTCatalog = 0x1000
 
 		// Constants for uniting object types
@@ -104,7 +111,7 @@ namespace DBBuilder.MSSQL
 	/// <summary>
 	/// Options available for saving scripts of database objects
 	/// </summary>
-	[Flags()]
+	[Flags]
 	public enum ObjectSaveOptions
 	{
 		AddObjectTypeSuffix = 1,
@@ -115,7 +122,7 @@ namespace DBBuilder.MSSQL
 	/// <summary>
 	/// Options available for saving table data
 	/// </summary>
-	[Flags()]
+	[Flags]
 	public enum DataSaveOptions
 	{
 		None = 0x0000,
