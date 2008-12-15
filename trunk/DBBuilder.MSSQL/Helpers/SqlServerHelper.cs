@@ -384,12 +384,12 @@ namespace DBBuilder.MSSQL.Helpers
 				{
 					exceptionData.AppendFormat("{0} = {1}", de.Key, de.Value);
 				}
-				logger.LogError(exceptionData.ToString());
+				if (logger != null) logger.LogError(exceptionData.ToString());
 				return null;
 			}
 			catch (IOException ex)
 			{
-				logger.LogError(ex.Message);
+				if (logger != null) logger.LogError(ex.Message);
 				return null;
 			}
 			return _dependencies;
@@ -657,7 +657,7 @@ namespace DBBuilder.MSSQL.Helpers
 				{
 					if (!(fileName.Contains("create") && databaseExists))
 					{
-						logger.LogMessage("executing " + fileName);
+						if (logger != null) logger.LogMessage("executing " + fileName);
 						srv.ConnectionContext.ExecuteNonQuery(string.Format(File.ReadAllText(fileName), databaseName, dataFilesDir));
 						srv.ConnectionContext.CommitTransaction();
 					}
@@ -1119,7 +1119,7 @@ namespace DBBuilder.MSSQL.Helpers
 			}
 			catch (ExecutionFailureException ex)
 			{
-				logger.LogWarning(string.Format(Resources.msgConversionLogInsertFailure, ex.Message));
+				if (logger != null) logger.LogWarning(string.Format(Resources.msgConversionLogInsertFailure, ex.Message));
 			}
 		}
 
@@ -1160,7 +1160,7 @@ namespace DBBuilder.MSSQL.Helpers
 			catch (Exception e)
 			{
 				// Basically ignore errors
-				logger.LogWarning(string.Format(Resources.msgScriptObjectFailure, objectName, objectType.ToString()));
+				if (logger != null) logger.LogWarning(string.Format(Resources.msgScriptObjectFailure, objectName, objectType.ToString()));
 				Trace.WriteLineIf(DBTask.traceSwitch.TraceWarning, e.ToString());
 			}
 		}
@@ -1200,16 +1200,16 @@ namespace DBBuilder.MSSQL.Helpers
 					}
 					catch (IOException ex)
 					{
-						logger.LogError(string.Format(Resources.msgFailure, fileName, ex.Message));
+						if (logger != null) logger.LogError(string.Format(Resources.msgFailure, fileName, ex.Message));
 						Trace.WriteLineIf(DBTask.traceSwitch.TraceError, ex.ToString());
 					}
 					catch (ExecutionFailureException ex)
 					{
-						logger.LogError(string.Format(Resources.msgFailure, fileName, ex.Message));
+						if (logger != null) logger.LogError(string.Format(Resources.msgFailure, fileName, ex.Message));
 						Trace.WriteLineIf(DBTask.traceSwitch.TraceError, ex.ToString());
 					}
 				}
-				logger.LogMessage(string.Format("Processed {0} objects for database {1}", _dependencies.Rows.Count, srv.ConnectionContext.DatabaseName));
+				if (logger != null) logger.LogMessage(string.Format("Processed {0} objects for database {1}", _dependencies.Rows.Count, srv.ConnectionContext.DatabaseName));
 			}
 			catch (ConstraintException ex)
 			{
@@ -1219,7 +1219,7 @@ namespace DBBuilder.MSSQL.Helpers
 				{
 					exceptionData.AppendFormat("{0} = {1}", de.Key, de.Value);
 				}
-				logger.LogError(exceptionData.ToString());
+				if (logger != null) logger.LogError(exceptionData.ToString());
 			}
 		}
 
