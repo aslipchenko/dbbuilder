@@ -42,7 +42,7 @@ namespace DBBuilder.MSSQL
 			string dllFileName = Path.GetFullPath(Assembly.GetExecutingAssembly().Location);
 			if (File.Exists(dllFileName + ".config"))
 			{
-				System.Configuration.Configuration config = ConfigurationManager.OpenExeConfiguration(dllFileName);
+				Configuration config = ConfigurationManager.OpenExeConfiguration(dllFileName);
 				string[] configKeys = config.AppSettings.Settings.AllKeys;
 				if (Array.Exists<string>(configKeys, delegate(string s) { return (s == "DBTasksTraceLevel") ? true : false; }))
 				{
@@ -137,7 +137,7 @@ namespace DBBuilder.MSSQL
 		{
 			Trace.WriteIf(traceSwitch.TraceVerbose, "DBCreateNewTask invoked");
 			SqlServerHelper.CreateNewDB(ServerName, DatabaseName, SourceDirName, DependencyFileName, false, "", this.Log);
-			return !this.Log.HasLoggedErrors;
+			return !Log.HasLoggedErrors;
 		}
 	}
 
@@ -174,7 +174,7 @@ namespace DBBuilder.MSSQL
 			Trace.WriteIf(traceSwitch.TraceVerbose, "DBRestoreObjectsTask invoked");
 			SqlServerHelper.RestoreDBObjects(ServerName, DatabaseName, SourceDirName, DependencyFileName, 
 			                                 LockDatabase, DropExistingObjectsOfTheSameType, this.Log);
-			return !this.Log.HasLoggedErrors;
+			return !Log.HasLoggedErrors;
 		}
 	}
 
@@ -214,7 +214,7 @@ namespace DBBuilder.MSSQL
 			                         ObjectSaveOptions.AddObjectTypePrefix | ObjectSaveOptions.SaveEachObjectTypeToSeparateDir,
 			                         this.Log);
 
-			return !this.Log.HasLoggedErrors;
+			return !Log.HasLoggedErrors;
 		}
 
 		private SqlObjectType ParseObjectTypeString(string objectTypes)
