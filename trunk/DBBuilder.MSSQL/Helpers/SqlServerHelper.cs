@@ -171,13 +171,6 @@ namespace DBBuilder.MSSQL.Helpers
 						ScriptObject(outputDir, saveOptions, dependencies, dropOptions, createOptions, sp.Name, sp, SqlObjectType.UserDefinedFunction, logger);
 					}
 				}
-				//foreach (UserDefinedFunction udf in srv.Databases[databaseName].UserDefinedFunctions)
-				//{
-				//   if (!udf.IsSystemObject)
-				//   {
-				//      ScriptObject(outputDir, saveOptions, dependencies, dropOptions, createOptions, udf.Name, udf, SqlObjectType.UserDefinedFunction, logger);
-				//   }
-				//}
 			}
 
 			if ((objectTypes & SqlObjectType.Trigger) > 0 & srv.Information.Version.Major > 8)
@@ -443,12 +436,13 @@ namespace DBBuilder.MSSQL.Helpers
 
 			foreach (object val in Enum.GetValues(typeof(SqlObjectType)))
 			{
-				int requiredServerVersion = GetRequiredServerVersion((SqlObjectType)val);
-				if ((objectTypes & (SqlObjectType)val) > 0)
+				SqlObjectType currentType = (SqlObjectType)val;
+				int requiredServerVersion = GetRequiredServerVersion(currentType);
+				if ((objectTypes & currentType) > 0)
 				{
 					if (srv.Information.Version.Major >= requiredServerVersion)
 					{
-						bool doNotUseDependencies = GetDoNotUseSysDependencies((SqlObjectType) val);
+						bool doNotUseDependencies = GetDoNotUseSysDependencies(currentType);
 						if (doNotUseDependencies)
 						{
 							ScriptingOptions dropOptions = new ScriptingOptions();
@@ -456,10 +450,16 @@ namespace DBBuilder.MSSQL.Helpers
 							dropOptions.ScriptDrops = true;
 							dropOptions.PrimaryObject = false;
 							List<StringCollection> dropQueries = new List<StringCollection>();
-							foreach (SmoObjectBase c in GetDBObjectsByType(srv, databaseName, (SqlObjectType)val))
+							foreach (SmoObjectBase c in GetDBObjectsByType(srv, databaseName, currentType))
 							{
-								if (c is IScriptable)
-									dropQueries.Add((c as IScriptable).Script(dropOptions));
+								if (currentType == SqlObjectType.StoredProcedure &&
+									((NamedSmoObject)c).Name.Contains("SqlQueryNotificationStoredProcedure"))
+								{
+									continue;
+								}
+								IScriptable scriptable = c as IScriptable;
+								if (scriptable != null)
+									dropQueries.Add(scriptable.Script(dropOptions));
 							}
 							foreach (StringCollection q in dropQueries)
 							{
@@ -468,12 +468,12 @@ namespace DBBuilder.MSSQL.Helpers
 						}
 						else
 						{
-							depData = GetDependencies((SqlObjectType) val, srv);
+							depData = GetDependencies(currentType, srv);
 							depData.DefaultView.Sort = "oSequence desc";
 							for (int i = 0; i < depData.DefaultView.Count; i++)
 							{
 								string objectName = (string) depData.DefaultView[i]["oObjName"];
-								object objectToDrop = GetDBObjectByName(srv, databaseName, objectName, (SqlObjectType) val);
+								object objectToDrop = GetDBObjectByName(srv, databaseName, objectName, currentType);
 								if ((objectToDrop != null) && (objectToDrop is IDroppable))
 								{
 									(objectToDrop as IDroppable).Drop();
