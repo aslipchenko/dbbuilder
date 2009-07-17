@@ -452,11 +452,6 @@ namespace DBBuilder.MSSQL.Helpers
 							List<StringCollection> dropQueries = new List<StringCollection>();
 							foreach (SmoObjectBase c in GetDBObjectsByType(srv, databaseName, currentType))
 							{
-								if (currentType == SqlObjectType.StoredProcedure &&
-									((NamedSmoObject)c).Name.Contains("SqlQueryNotificationStoredProcedure"))
-								{
-									continue;
-								}
 								IScriptable scriptable = c as IScriptable;
 								if (scriptable != null)
 									dropQueries.Add(scriptable.Script(dropOptions));
@@ -472,7 +467,12 @@ namespace DBBuilder.MSSQL.Helpers
 							depData.DefaultView.Sort = "oSequence desc";
 							for (int i = 0; i < depData.DefaultView.Count; i++)
 							{
-								string objectName = (string) depData.DefaultView[i]["oObjName"];
+								string objectName = (string)depData.DefaultView[i]["oObjName"];
+								if (currentType == SqlObjectType.StoredProcedure &&
+									objectName.Contains("SqlQueryNotificationStoredProcedure"))
+								{
+									continue;
+								}
 								object objectToDrop = GetDBObjectByName(srv, databaseName, objectName, currentType);
 								if ((objectToDrop != null) && (objectToDrop is IDroppable))
 								{
